@@ -1,0 +1,54 @@
+{
+  "service": "kart-delivery-tracking-service",
+  "exchanges": [
+    { "name": "tracking.exchange", "type": "topic", "durable": true },
+    { "name": "tracking.dlx", "type": "topic", "durable": true }
+  ],
+  "externalExchanges": [
+    { "name": "shipping.exchange", "type": "topic", "durable": true }
+  ],
+  "publishedEvents": [
+    { "eventType": "DeliveryStatusUpdated", "exchange": "tracking.exchange", "routingKey": "tracking.delivery-status.updated" },
+    { "eventType": "CarrierStatusIngested", "exchange": "tracking.exchange", "routingKey": "tracking.carrier-status.ingested" },
+    { "eventType": "UnmappedCarrierStatusFlagged", "exchange": "tracking.exchange", "routingKey": "tracking.unmapped-carrier-status.flagged" }
+  ],
+  "queues": [
+    {
+      "name": "tracking.shipping-events.queue",
+      "durable": true,
+      "bindings": [
+        { "exchange": "shipping.exchange", "routingKey": "shipping.shipment.dispatched" }
+      ],
+      "deadLetter": { "exchange": "tracking.dlx", "routingKey": "tracking.shipping-events.dlq" },
+      "retryLadder": {
+        "requeueTo": "tracking.shipping-events.queue",
+        "tiers": [
+          { "name": "tracking.shipping-events.retry.30s", "ttlMs": 30000 },
+          { "name": "tracking.shipping-events.retry.5m", "ttlMs": 300000 },
+          { "name": "tracking.shipping-events.retry.30m", "ttlMs": 1800000 }
+        ]
+      }
+    },
+    {
+      "name": "tracking.carrier-status-ingested.queue",
+      "durable": true,
+      "bindings": [
+        { "exchange": "tracking.exchange", "routingKey": "tracking.carrier-status.ingested" }
+      ],
+      "deadLetter": { "exchange": "tracking.dlx", "routingKey": "tracking.carrier-status-ingested.dlq" },
+      "retryLadder": {
+        "requeueTo": "tracking.carrier-status-ingested.queue",
+        "tiers": [
+          { "name": "tracking.carrier-status-ingested.retry.30s", "ttlMs": 30000 },
+          { "name": "tracking.carrier-status-ingested.retry.5m", "ttlMs": 300000 },
+          { "name": "tracking.carrier-status-ingested.retry.30m", "ttlMs": 1800000 }
+        ]
+      }
+    }
+  ],
+  "deadLetterQueues": [
+    { "name": "tracking.shipping-events.dlq", "exchange": "tracking.dlx", "routingKey": "tracking.shipping-events.dlq" },
+    { "name": "tracking.carrier-status-ingested.dlq", "exchange": "tracking.dlx", "routingKey": "tracking.carrier-status-ingested.dlq" }
+  ],
+  "_comment": "Source of truth for this service's entire RabbitMQ topology (event-contract.md; the draft manifest in kart-platform/docs/services/kart-delivery-tracking-service/message-bus-manifest.json only sketched the ShipmentDispatched consumer queue - this file completes it with this service's own publishing topology). Nothing here is hardcoded in C# - RabbitMqTopologyProvisioner declares every exchange/queue/binding/DLQ/retry-tier straight from this file at startup, exactly like kart-inventory-service/kart-category-service/kart-identity-service. DeliveryStatusUpdated/CarrierStatusIngested/UnmappedCarrierStatusFlagged are all published via this service's own Mongo-backed transactional outbox (OutboxRelayHostedService), which retries indefinitely until RabbitMQ is reachable rather than dead-lettering - so, per the same convention kart-inventory-service's manifest already uses, published events appear only in publishedEvents, never with a DLQ of their own. tracking.carrier-status-ingested.queue is this service's own internal async processing pipeline for the event it publishes to itself (design-decisions.md's 'Durable Ingestion Buffering Pattern') - a self-consumed event, distinct from the externally-consumed tracking.shipping-events.queue."
+}

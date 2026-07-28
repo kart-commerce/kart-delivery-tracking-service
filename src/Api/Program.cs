@@ -1,4 +1,5 @@
 using Kart.Shared.Auditing;
+using Kart.Shared.Configuration;
 using Kart.Shared.ErrorHandling;
 using Kart.Shared.Observability;
 using KartDeliveryTrackingService.Application;
@@ -6,6 +7,12 @@ using KartDeliveryTrackingService.Infrastructure;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// kart-conventions.md Configuration Management: GlobalConfig external-secrets-file bootstrap,
+// shared across every service - never reimplemented per service. See appsettings.Local.json.example.
+// Must run before AddKartObservability, since Observability:LogFile:Directory can itself live in
+// the GlobalConfig file.
+builder.AddKartGlobalConfig();
 
 // kart-conventions.md Observability section: Serilog + OpenTelemetry SDK behind one DI call,
 // never reimplemented per service. Standard (not 100%) trace-sampling tier - this service is not

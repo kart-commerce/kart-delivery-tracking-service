@@ -1,5 +1,5 @@
 using FluentAssertions;
-using KartDeliveryTrackingService.Infrastructure.Messaging;
+using Kart.Shared.Messaging;
 using KartDeliveryTrackingService.IntegrationTests.Fixtures;
 using Xunit;
 

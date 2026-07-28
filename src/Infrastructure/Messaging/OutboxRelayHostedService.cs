@@ -1,4 +1,5 @@
 using System.Text;
+using Kart.Shared.Messaging;
 using KartDeliveryTrackingService.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

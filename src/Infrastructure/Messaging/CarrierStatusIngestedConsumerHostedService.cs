@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Kart.Shared.Messaging;
 using KartDeliveryTrackingService.Application.Common.Models;
 using KartDeliveryTrackingService.Application.Features.ApplyCarrierStatusUpdate;
 using KartDeliveryTrackingService.Domain.Tracking;

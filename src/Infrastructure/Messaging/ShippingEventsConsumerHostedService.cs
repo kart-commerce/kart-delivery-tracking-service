@@ -89,8 +89,7 @@ public sealed class ShippingEventsConsumerHostedService : BackgroundService
             var payload = JsonSerializer.Deserialize<ShipmentDispatchedEventPayload>(json, SerializerOptions)
                 ?? throw new InvalidOperationException("ShipmentDispatched payload deserialized to null.");
 
-            // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - this consumer's
-            // entry point, pushed once here per checkpoint-logging-standard.md.
+            // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - this consumer's entry point.
             using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
             _logger.LogInformation(
                 "Stage {Stage}: consumed ShipmentDispatched from {Queue} for order {OrderId}, tracking {TrackingId}",
@@ -100,10 +99,6 @@ public sealed class ShippingEventsConsumerHostedService : BackgroundService
                 payload.TrackingId);
 
             var command = new CreateTrackingRecordOnShipmentDispatchedCommand(payload.OrderId, payload.Carrier, payload.TrackingId);
-            _logger.LogInformation(
-                "Stage {Stage}: dispatching CreateTrackingRecordOnShipmentDispatchedCommand for {TrackingId}",
-                "CreateTrackingRecordOnShipmentDispatchedCommandDispatched",
-                payload.TrackingId);
             var result = await sender.Send(command, stoppingToken);
 
             if (result.IsFailure)

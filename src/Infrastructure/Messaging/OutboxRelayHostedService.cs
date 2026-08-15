@@ -98,8 +98,7 @@ public sealed class OutboxRelayHostedService : BackgroundService
 
             // Every event type this relay ever publishes (CarrierStatusIngested,
             // UnmappedCarrierStatusFlagged, DeliveryStatusUpdated) belongs to business-flows.md
-            // flow #8, "Shipping, Warehouse & Fulfillment" - unconditional per checkpoint-logging-
-            // standard.md, mirroring kart-identity-service's own OutboxRelayHostedService.
+            // flow #8, "Shipping, Warehouse & Fulfillment".
             using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
 
             channel.BasicPublish(

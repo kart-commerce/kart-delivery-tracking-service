@@ -87,13 +87,6 @@ public sealed class CreateTrackingRecordOnShipmentDispatchedCommandHandler
             request.OrderId,
             request.Carrier);
 
-        _logger.LogInformation(
-            "Stage {Stage}: tracking record created for {TrackingId} (order {OrderId}, carrier {Carrier}).",
-            "TrackingRecordCreationFlowStepCompleted",
-            request.TrackingId,
-            request.OrderId,
-            request.Carrier);
-
         return Result.Success();
     }
 }

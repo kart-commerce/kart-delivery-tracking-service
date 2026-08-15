@@ -92,13 +92,7 @@ public sealed class IngestCarrierWebhookCommandHandler : IRequestHandler<IngestC
         }
 
         _logger.LogInformation(
-            "Stage {Stage}: CarrierStatusIngested outbox event enqueued for {TrackingId} ({CarrierId})",
-            "CarrierStatusIngestedOutboxEventEnqueued",
-            trackingId,
-            request.CarrierId);
-
-        _logger.LogInformation(
-            "Stage {Stage}: carrier webhook for {TrackingId} ({CarrierId}) accepted",
+            "Stage {Stage}: carrier webhook for {TrackingId} ({CarrierId}) accepted, CarrierStatusIngested outbox event enqueued",
             "IngestCarrierWebhookAccepted",
             trackingId,
             request.CarrierId);

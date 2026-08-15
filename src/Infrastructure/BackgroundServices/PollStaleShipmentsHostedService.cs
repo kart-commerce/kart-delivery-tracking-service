@@ -40,7 +40,6 @@ public sealed class PollStaleShipmentsHostedService : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var sender = scope.ServiceProvider.GetRequiredService<ISender>();
                 var command = new PollStaleShipmentsCommand();
-                _logger.LogInformation("Stage {Stage}: dispatching PollStaleShipmentsCommand.", "PollStaleShipmentsCommandDispatched");
                 var result = await sender.Send(command, stoppingToken);
                 if (result.IsSuccess && result.Value > 0)
                 {

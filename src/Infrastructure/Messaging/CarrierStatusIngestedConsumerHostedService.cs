@@ -91,8 +91,7 @@ public sealed class CarrierStatusIngestedConsumerHostedService : BackgroundServi
             var payload = JsonSerializer.Deserialize<CarrierStatusIngestedEventPayload>(json, SerializerOptions)
                 ?? throw new InvalidOperationException("CarrierStatusIngested payload deserialized to null.");
 
-            // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - this consumer's
-            // entry point, pushed once here per checkpoint-logging-standard.md.
+            // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - this consumer's entry point.
             using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
             _logger.LogInformation(
                 "Stage {Stage}: consumed CarrierStatusIngested from {Queue} for tracking {TrackingId} (carrier {CarrierId})",
@@ -108,10 +107,6 @@ public sealed class CarrierStatusIngestedConsumerHostedService : BackgroundServi
                 payload.EventTimestamp,
                 payload.RawPayload,
                 IngestionSource.Webhook);
-            _logger.LogInformation(
-                "Stage {Stage}: dispatching ApplyCarrierStatusUpdateCommand for {TrackingId}",
-                "ApplyCarrierStatusUpdateCommandDispatched",
-                payload.TrackingId);
             var result = await sender.Send(command, stoppingToken);
 
             if (result.IsFailure)

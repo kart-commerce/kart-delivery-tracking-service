@@ -36,7 +36,6 @@ public sealed class TrackingController : ControllerBase
         _logger.LogInformation("Stage {Stage}: get-tracking-status request received for {TrackingId}", "GetTrackingStatusRequestReceived", trackingId);
 
         var query = new GetTrackingStatusQuery(trackingId);
-        _logger.LogInformation("Stage {Stage}: dispatching GetTrackingStatusQuery for {TrackingId}", "GetTrackingStatusQueryDispatched", trackingId);
         var result = await _sender.Send(query, cancellationToken);
         if (result.IsFailure)
         {

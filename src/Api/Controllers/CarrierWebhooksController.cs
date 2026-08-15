@@ -44,7 +44,6 @@ public sealed class CarrierWebhooksController : ControllerBase
 
         var signatureHeader = Request.Headers["X-Carrier-Signature"].FirstOrDefault();
         var command = new IngestCarrierWebhookCommand(carrierId, signatureHeader, rawBody);
-        _logger.LogInformation("Stage {Stage}: dispatching IngestCarrierWebhookCommand for {CarrierId}", "IngestCarrierWebhookCommandDispatched", carrierId);
         var result = await _sender.Send(command, cancellationToken);
 
         if (result.IsSuccess)

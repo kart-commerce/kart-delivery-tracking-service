@@ -133,12 +133,6 @@ public sealed class ApplyCarrierStatusUpdateCommandHandler : IRequestHandler<App
                     "CarrierStatusTransitionAcceptedOutboxEventEnqueued",
                     canonicalStatus,
                     request.TrackingId);
-
-                _logger.LogInformation(
-                    "Stage {Stage}: delivery status update flow step completed for {TrackingId} ({Status}).",
-                    "DeliveryStatusUpdateFlowStepCompleted",
-                    request.TrackingId,
-                    canonicalStatus);
             }
             else
             {

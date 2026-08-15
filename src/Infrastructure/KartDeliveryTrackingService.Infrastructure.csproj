@@ -9,6 +9,12 @@
     <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
     <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
     <PackageReference Include="Kart.Shared.Messaging" Version="0.1.0" />
+    <!-- kart-conventions.md Observability section: KartFlowContext/FlowEnricher for this layer's
+         hosted services (outbox relay, RabbitMQ consumers, sweep hosted services) - the Api layer
+         already references this for AddKartObservability/controllers; this project needs it
+         directly for its own BackgroundService entry points (same pattern as kart-offer-service's
+         Infrastructure.csproj). -->
+    <PackageReference Include="Kart.Shared.Observability" Version="0.3.0" />
     <PackageReference Include="Polly" Version="8.4.2" />
     <PackageReference Include="Polly.Extensions.Http" Version="3.0.0" />
   </ItemGroup>

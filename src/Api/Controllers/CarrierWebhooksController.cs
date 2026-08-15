@@ -1,3 +1,5 @@
+using Kart.Shared.Observability;
+using KartDeliveryTrackingService.Application.Common;
 using KartDeliveryTrackingService.Application.Features.IngestCarrierWebhook;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -14,11 +16,13 @@ public sealed class CarrierWebhooksController : ControllerBase
 {
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<CarrierWebhooksController> _logger;
 
-    public CarrierWebhooksController(ISender sender, TimeProvider timeProvider)
+    public CarrierWebhooksController(ISender sender, TimeProvider timeProvider, ILogger<CarrierWebhooksController> logger)
     {
         _sender = sender;
         _timeProvider = timeProvider;
+        _logger = logger;
     }
 
     /// <summary>TRK-3: contracts/api-contract.yaml ingestCarrierWebhook - POST /internal/v1/webhooks/carriers/{carrierId}.</summary>
@@ -29,13 +33,19 @@ public sealed class CarrierWebhooksController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> IngestCarrierWebhook([FromRoute] string carrierId, CancellationToken cancellationToken)
     {
+        // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - carrier webhook intake.
+        using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
+        _logger.LogInformation("Stage {Stage}: carrier webhook request received for {CarrierId}", "IngestCarrierWebhookRequestReceived", carrierId);
+
         Request.EnableBuffering();
         using var reader = new MemoryStream();
         await Request.Body.CopyToAsync(reader, cancellationToken);
         var rawBody = reader.ToArray();
 
         var signatureHeader = Request.Headers["X-Carrier-Signature"].FirstOrDefault();
-        var result = await _sender.Send(new IngestCarrierWebhookCommand(carrierId, signatureHeader, rawBody), cancellationToken);
+        var command = new IngestCarrierWebhookCommand(carrierId, signatureHeader, rawBody);
+        _logger.LogInformation("Stage {Stage}: dispatching IngestCarrierWebhookCommand for {CarrierId}", "IngestCarrierWebhookCommandDispatched", carrierId);
+        var result = await _sender.Send(command, cancellationToken);
 
         if (result.IsSuccess)
         {

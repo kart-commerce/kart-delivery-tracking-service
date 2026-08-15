@@ -57,7 +57,8 @@ public sealed class CreateTrackingRecordOnShipmentDispatchedCommandHandler
             // Domain Invariant requiring idempotent consumption is satisfied by simply not
             // duplicating work, not by treating this as an error.
             _logger.LogInformation(
-                "ShipmentDispatched for {TrackingId} already materialized; skipping duplicate creation.",
+                "Stage {Stage}: ShipmentDispatched for {TrackingId} already materialized; skipping duplicate creation.",
+                "ShipmentDispatchedIdempotentReplaySkipped",
                 request.TrackingId);
             return Result.Success();
         }
@@ -79,7 +80,20 @@ public sealed class CreateTrackingRecordOnShipmentDispatchedCommandHandler
         // result under a race) never produces a second anchor.
         await _statusHistory.AppendAsync($"{request.TrackingId}:system-anchor", anchorEntry, cancellationToken);
 
-        _logger.LogInformation("Created tracking record for {TrackingId} (order {OrderId}, carrier {Carrier}).", request.TrackingId, request.OrderId, request.Carrier);
+        _logger.LogInformation(
+            "Stage {Stage}: tracking record persisted for {TrackingId} (order {OrderId}, carrier {Carrier}), system anchor status-history entry appended.",
+            "TrackingRecordPersisted",
+            request.TrackingId,
+            request.OrderId,
+            request.Carrier);
+
+        _logger.LogInformation(
+            "Stage {Stage}: tracking record created for {TrackingId} (order {OrderId}, carrier {Carrier}).",
+            "TrackingRecordCreationFlowStepCompleted",
+            request.TrackingId,
+            request.OrderId,
+            request.Carrier);
+
         return Result.Success();
     }
 }

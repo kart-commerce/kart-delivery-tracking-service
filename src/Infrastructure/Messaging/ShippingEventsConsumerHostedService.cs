@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using Kart.Shared.Messaging;
+using Kart.Shared.Observability;
+using KartDeliveryTrackingService.Application.Common;
 using KartDeliveryTrackingService.Application.Common.Models;
 using KartDeliveryTrackingService.Application.Features.CreateTrackingRecordOnShipmentDispatched;
 using MediatR;
@@ -87,8 +89,22 @@ public sealed class ShippingEventsConsumerHostedService : BackgroundService
             var payload = JsonSerializer.Deserialize<ShipmentDispatchedEventPayload>(json, SerializerOptions)
                 ?? throw new InvalidOperationException("ShipmentDispatched payload deserialized to null.");
 
-            var result = await sender.Send(
-                new CreateTrackingRecordOnShipmentDispatchedCommand(payload.OrderId, payload.Carrier, payload.TrackingId), stoppingToken);
+            // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - this consumer's
+            // entry point, pushed once here per checkpoint-logging-standard.md.
+            using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
+            _logger.LogInformation(
+                "Stage {Stage}: consumed ShipmentDispatched from {Queue} for order {OrderId}, tracking {TrackingId}",
+                "ShipmentDispatchedEventConsumed",
+                QueueName,
+                payload.OrderId,
+                payload.TrackingId);
+
+            var command = new CreateTrackingRecordOnShipmentDispatchedCommand(payload.OrderId, payload.Carrier, payload.TrackingId);
+            _logger.LogInformation(
+                "Stage {Stage}: dispatching CreateTrackingRecordOnShipmentDispatchedCommand for {TrackingId}",
+                "CreateTrackingRecordOnShipmentDispatchedCommandDispatched",
+                payload.TrackingId);
+            var result = await sender.Send(command, stoppingToken);
 
             if (result.IsFailure)
             {
@@ -118,11 +134,11 @@ public sealed class ShippingEventsConsumerHostedService : BackgroundService
             channel.BasicPublish(exchange: string.Empty, routingKey: tier.Name, basicProperties: properties, body: deliverEventArgs.Body);
             channel.BasicAck(deliverEventArgs.DeliveryTag, multiple: false);
 
-            _logger.LogWarning(ex, "Handling ShipmentDispatched failed; routed to retry tier {Tier} (attempt {Attempt}).", tier.Name, retryCount + 1);
+            _logger.LogWarning(ex, "Stage {Stage}: handling ShipmentDispatched failed; routed to retry tier {Tier} (attempt {Attempt}).", "ShipmentDispatchedHandlingRetried", tier.Name, retryCount + 1);
         }
         else
         {
-            _logger.LogCritical(ex, "Handling ShipmentDispatched failed after exhausting all retry tiers; dead-lettering.");
+            _logger.LogCritical(ex, "Stage {Stage}: handling ShipmentDispatched failed after exhausting all retry tiers; dead-lettering.", "ShipmentDispatchedHandlingDeadLettered");
             channel.BasicNack(deliverEventArgs.DeliveryTag, multiple: false, requeue: false);
         }
     }

@@ -2,16 +2,19 @@ using Kart.Shared.Domain;
 using KartDeliveryTrackingService.Application.Common.Interfaces;
 using KartDeliveryTrackingService.Application.Common.Models;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace KartDeliveryTrackingService.Application.Features.GetTrackingStatus;
 
 public sealed class GetTrackingStatusQueryHandler : IRequestHandler<GetTrackingStatusQuery, Result<TrackingStatusResult>>
 {
     private readonly ITrackingRecordRepository _trackingRecords;
+    private readonly ILogger<GetTrackingStatusQueryHandler> _logger;
 
-    public GetTrackingStatusQueryHandler(ITrackingRecordRepository trackingRecords)
+    public GetTrackingStatusQueryHandler(ITrackingRecordRepository trackingRecords, ILogger<GetTrackingStatusQueryHandler> logger)
     {
         _trackingRecords = trackingRecords;
+        _logger = logger;
     }
 
     public async Task<Result<TrackingStatusResult>> Handle(GetTrackingStatusQuery request, CancellationToken cancellationToken)
@@ -24,6 +27,7 @@ public sealed class GetTrackingStatusQueryHandler : IRequestHandler<GetTrackingS
         // Status Event Has Arrived").
         if (record is null)
         {
+            _logger.LogInformation("Stage {Stage}: no tracking record materialized yet for {TrackingId}", "TrackingStatusPendingNotYetMaterialized", request.TrackingId);
             return Result.Success(TrackingStatusResult.AsPending(request.TrackingId));
         }
 
@@ -32,6 +36,12 @@ public sealed class GetTrackingStatusQueryHandler : IRequestHandler<GetTrackingS
             record.CurrentStatus,
             new EtaResponse(record.Eta.Value, record.Eta.Source),
             record.LastUpdatedAt);
+
+        _logger.LogInformation(
+            "Stage {Stage}: tracking status {Status} found for {TrackingId}",
+            "TrackingStatusFound",
+            record.CurrentStatus,
+            request.TrackingId);
 
         return Result.Success(TrackingStatusResult.Found(response));
     }

@@ -30,10 +30,19 @@ public sealed class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
         var requestName = typeof(TRequest).Name;
         var stopwatch = Stopwatch.StartNew();
 
+        // checkpoint-logging-standard.md taxonomy stage 3 ("<Command>HandlerStarted", first line
+        // inside Handle()) generalized here rather than duplicated in every handler - this behavior
+        // already wraps every MediatR request, so it's the one place that's true by construction.
+        _logger.LogInformation(
+            "Stage {Stage}: {RequestName} handler started",
+            $"{requestName}HandlerStarted",
+            requestName);
+
         var response = await next();
 
         _logger.LogInformation(
-            "{RequestName} completed in {ElapsedMilliseconds}ms",
+            "Stage {Stage}: {RequestName} completed in {ElapsedMilliseconds}ms",
+            $"{requestName}Completed",
             requestName,
             stopwatch.ElapsedMilliseconds);
 

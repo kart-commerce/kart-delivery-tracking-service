@@ -2,6 +2,7 @@ using FluentAssertions;
 using KartDeliveryTrackingService.Application.Common.Interfaces;
 using KartDeliveryTrackingService.Application.Features.GetTrackingStatus;
 using KartDeliveryTrackingService.Domain.Tracking;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -13,7 +14,7 @@ public class GetTrackingStatusQueryHandlerTests
 
     private readonly Mock<ITrackingRecordRepository> _trackingRecords = new();
 
-    private GetTrackingStatusQueryHandler CreateHandler() => new(_trackingRecords.Object);
+    private GetTrackingStatusQueryHandler CreateHandler() => new(_trackingRecords.Object, NullLogger<GetTrackingStatusQueryHandler>.Instance);
 
     [Fact]
     public async Task Handle_WhenNoRecordExists_ReturnsPending_NeverAFailure()

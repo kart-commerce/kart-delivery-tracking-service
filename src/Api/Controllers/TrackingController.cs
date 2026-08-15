@@ -1,4 +1,6 @@
+using Kart.Shared.Observability;
 using KartDeliveryTrackingService.Api.Common;
+using KartDeliveryTrackingService.Application.Common;
 using KartDeliveryTrackingService.Application.Common.Models;
 using KartDeliveryTrackingService.Application.Features.GetTrackingStatus;
 using MediatR;
@@ -14,10 +16,12 @@ public sealed class TrackingController : ControllerBase
     private const int PendingRetryAfterSeconds = 3;
 
     private readonly ISender _sender;
+    private readonly ILogger<TrackingController> _logger;
 
-    public TrackingController(ISender sender)
+    public TrackingController(ISender sender, ILogger<TrackingController> logger)
     {
         _sender = sender;
+        _logger = logger;
     }
 
     /// <summary>TRK-2: contracts/api-contract.yaml getTrackingStatus - GET /v1/tracking/{trackingId}. Never 404 (ddd-model.md Modeling Decision 2).</summary>
@@ -26,7 +30,14 @@ public sealed class TrackingController : ControllerBase
     [ProducesResponseType(typeof(PendingTrackingResponse), StatusCodes.Status202Accepted)]
     public async Task<IActionResult> GetTrackingStatus([FromRoute] string trackingId, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new GetTrackingStatusQuery(trackingId), cancellationToken);
+        // business-flows.md flow #14, "Customer Support & Order Tracking" - this endpoint is the
+        // order-tracking/status-lookup step; see FlowNames.CustomerSupportOrderTracking's remarks.
+        using var _ = KartFlowContext.Push(FlowNames.CustomerSupportOrderTracking);
+        _logger.LogInformation("Stage {Stage}: get-tracking-status request received for {TrackingId}", "GetTrackingStatusRequestReceived", trackingId);
+
+        var query = new GetTrackingStatusQuery(trackingId);
+        _logger.LogInformation("Stage {Stage}: dispatching GetTrackingStatusQuery for {TrackingId}", "GetTrackingStatusQueryDispatched", trackingId);
+        var result = await _sender.Send(query, cancellationToken);
         if (result.IsFailure)
         {
             return this.MapFailure(result.Error);

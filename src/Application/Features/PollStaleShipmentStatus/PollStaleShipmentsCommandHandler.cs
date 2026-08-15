@@ -49,18 +49,26 @@ public sealed class PollStaleShipmentsCommandHandler : IRequestHandler<PollStale
                 var result = await _carrierTrackingClient.PollAsync(record.CarrierId, record.TrackingId, cancellationToken);
                 if (result is null)
                 {
+                    _logger.LogInformation(
+                        "Stage {Stage}: carrier poll returned no result for {TrackingId} ({CarrierId}); skipping.",
+                        "CarrierPollNoResultSkipped",
+                        record.TrackingId,
+                        record.CarrierId);
                     continue;
                 }
 
-                await _sender.Send(
-                    new ApplyCarrierStatusUpdateCommand(
-                        record.CarrierId,
-                        record.TrackingId,
-                        result.CarrierStatusCode,
-                        result.EventTimestamp,
-                        result.RawPayload,
-                        IngestionSource.Poll),
-                    cancellationToken);
+                var command = new ApplyCarrierStatusUpdateCommand(
+                    record.CarrierId,
+                    record.TrackingId,
+                    result.CarrierStatusCode,
+                    result.EventTimestamp,
+                    result.RawPayload,
+                    IngestionSource.Poll);
+                _logger.LogInformation(
+                    "Stage {Stage}: dispatching ApplyCarrierStatusUpdateCommand (poll fallback) for {TrackingId}",
+                    "ApplyCarrierStatusUpdateCommandDispatched",
+                    record.TrackingId);
+                await _sender.Send(command, cancellationToken);
 
                 polled++;
             }
@@ -70,7 +78,7 @@ public sealed class PollStaleShipmentsCommandHandler : IRequestHandler<PollStale
                 // shipment (design-decisions.md's per-carrier circuit-breaker/bulkhead isolation
                 // already bounds a single carrier's own failure impact; this is the sweep-loop
                 // level backstop for anything that still escapes it).
-                _logger.LogWarning(ex, "Polling fallback failed for {TrackingId} ({CarrierId}).", record.TrackingId, record.CarrierId);
+                _logger.LogWarning(ex, "Stage {Stage}: polling fallback failed for {TrackingId} ({CarrierId}).", "CarrierPollFailedSkipped", record.TrackingId, record.CarrierId);
             }
         }
 

@@ -56,7 +56,10 @@ public sealed class ApplyCarrierStatusUpdateCommandHandler : IRequestHandler<App
         var existingDedupEntry = await _dedup.TryGetAsync(dedupKey, cancellationToken);
         if (existingDedupEntry is not null)
         {
-            _logger.LogInformation("Suppressed duplicate carrier status update for {TrackingId} (dedup key already recorded).", request.TrackingId);
+            _logger.LogInformation(
+                "Stage {Stage}: suppressed duplicate carrier status update for {TrackingId} (dedup key already recorded).",
+                "DuplicateCarrierStatusUpdateSuppressed",
+                request.TrackingId);
             return Result.Success();
         }
 
@@ -89,7 +92,8 @@ public sealed class ApplyCarrierStatusUpdateCommandHandler : IRequestHandler<App
                 cancellationToken);
 
             _logger.LogWarning(
-                "Unmapped carrier status code {CarrierStatusCode} for carrier {CarrierId}, tracking {TrackingId} - flagged for triage.",
+                "Stage {Stage}: unmapped carrier status code {CarrierStatusCode} for carrier {CarrierId}, tracking {TrackingId} - status history persisted, outbox event enqueued, flagged for triage.",
+                "UnmappedCarrierStatusFlagged",
                 request.CarrierStatusCode,
                 request.CarrierId,
                 request.TrackingId);
@@ -123,11 +127,24 @@ public sealed class ApplyCarrierStatusUpdateCommandHandler : IRequestHandler<App
                     new DeliveryStatusUpdatedEventPayload(request.TrackingId, canonicalStatus.Value.ToString()),
                     deterministicId: $"{dedupKey}:delivery-status-updated",
                     cancellationToken);
+
+                _logger.LogInformation(
+                    "Stage {Stage}: carrier status transition to {Status} accepted for {TrackingId}, status history persisted, DeliveryStatusUpdated outbox event enqueued.",
+                    "CarrierStatusTransitionAcceptedOutboxEventEnqueued",
+                    canonicalStatus,
+                    request.TrackingId);
+
+                _logger.LogInformation(
+                    "Stage {Stage}: delivery status update flow step completed for {TrackingId} ({Status}).",
+                    "DeliveryStatusUpdateFlowStepCompleted",
+                    request.TrackingId,
+                    canonicalStatus);
             }
             else
             {
                 _logger.LogInformation(
-                    "Rejected regressing/duplicate-ordinal carrier status {Status} for {TrackingId} (current ordinal not exceeded).",
+                    "Stage {Stage}: rejected regressing/duplicate-ordinal carrier status {Status} for {TrackingId} (current ordinal not exceeded).",
+                    "CarrierStatusTransitionRejectedOutOfOrder",
                     canonicalStatus,
                     request.TrackingId);
             }
@@ -149,6 +166,12 @@ public sealed class ApplyCarrierStatusUpdateCommandHandler : IRequestHandler<App
                 now,
                 SystemPrincipals.TerminalStatusSweep,
                 cancellationToken);
+
+            _logger.LogInformation(
+                "Stage {Stage}: {TrackingId} reached terminal status {Status}; dedup entries retargeted to terminal grace window.",
+                "TerminalDeliveryStatusDedupRetargeted",
+                request.TrackingId,
+                canonicalStatus);
         }
 
         return Result.Success();

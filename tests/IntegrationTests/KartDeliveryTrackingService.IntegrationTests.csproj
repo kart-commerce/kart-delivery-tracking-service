@@ -11,6 +11,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="Testcontainers.MongoDb" Version="3.10.0" />
     <PackageReference Include="Testcontainers.RabbitMq" Version="3.10.0" />
+    <!-- Transitive pin: Testcontainers 3.10.0 pulls SSH.NET 2023.0.0, vulnerable to GHSA-q939-rpr3-3284
+         (ScpClient recursive download arbitrary file write), fixed in 2026.0.0. Pinned directly rather than
+         bumping Testcontainers to a major version with breaking changes. -->
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

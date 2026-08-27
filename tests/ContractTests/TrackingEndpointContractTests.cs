@@ -3,23 +3,23 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
 namespace KartDeliveryTrackingService.ContractTests;
 
 /// <summary>
 /// Verifies live HTTP responses against contracts/api-contract.yaml - mirrors
-/// kart-inventory-service's ContractTests shape (WebApplicationFactory&lt;Program&gt;). Neither
-/// endpoint requires authentication (api-contract.yaml: the GET path declares no security scheme;
-/// the webhook path explicitly declares `security: []`), so no fake auth handler is needed here,
-/// unlike kart-inventory-service's TestAuthenticationHandler.
+/// kart-inventory-service's ContractTests shape (a dedicated WebApplicationFactory&lt;Program&gt;
+/// subclass, <see cref="DeliveryTrackingApiFactory"/>, swapping DB-backed dependencies for
+/// in-memory fakes). Neither endpoint requires authentication (api-contract.yaml: the GET path
+/// declares no security scheme; the webhook path explicitly declares `security: []`), so no fake
+/// auth handler is needed here, unlike kart-inventory-service's TestAuthenticationHandler.
 /// </summary>
-public class TrackingEndpointContractTests : IClassFixture<WebApplicationFactory<Program>>
+public class TrackingEndpointContractTests : IClassFixture<DeliveryTrackingApiFactory>
 {
     private readonly HttpClient _client;
 
-    public TrackingEndpointContractTests(WebApplicationFactory<Program> factory)
+    public TrackingEndpointContractTests(DeliveryTrackingApiFactory factory)
     {
         _client = factory.CreateClient();
     }

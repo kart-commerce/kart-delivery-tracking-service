@@ -1,3 +1,4 @@
+using Kart.Shared.Messaging;
 using KartDeliveryTrackingService.Application.Common.Interfaces;
 using KartDeliveryTrackingService.Application.Common.Options;
 using KartDeliveryTrackingService.Infrastructure.BackgroundServices;
@@ -8,7 +9,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
-using RabbitMQ.Client;
 
 namespace KartDeliveryTrackingService.Infrastructure;
 
@@ -56,20 +56,13 @@ public static class DependencyInjection
         // registering it here is safe even if RabbitMQ is unreachable at startup - each hosted
         // service below owns its own retrying connection.
         services.Configure<RabbitMqOptions>(configuration.GetSection("RabbitMq"));
-        services.AddSingleton(sp =>
+        services.AddKartMessageBusManifest(sp => sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value.ManifestPath);
+        services.AddKartRabbitMqConnectionFactory(sp =>
         {
             var options = sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value;
-            var manifestPath = Path.IsPathRooted(options.ManifestPath)
-                ? options.ManifestPath
-                : Path.Combine(AppContext.BaseDirectory, options.ManifestPath);
-            return MessageBusManifestLoader.Load(manifestPath);
+            return new RabbitMqConnectionSettings(options.HostName);
         });
-        services.AddSingleton<IConnectionFactory>(sp => new ConnectionFactory
-        {
-            HostName = sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value.HostName,
-            DispatchConsumersAsync = true,
-        });
-        services.AddHostedService<RabbitMqTopologyStartupHostedService>();
+        services.AddKartRabbitMqTopologyStartup();
         services.AddHostedService<OutboxRelayHostedService>();
         services.AddHostedService<ShippingEventsConsumerHostedService>();
         services.AddHostedService<CarrierStatusIngestedConsumerHostedService>();

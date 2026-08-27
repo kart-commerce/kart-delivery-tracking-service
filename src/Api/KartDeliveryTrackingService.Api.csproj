@@ -14,8 +14,12 @@
   -->
   <ItemGroup>
     <PackageReference Include="Kart.Shared.ErrorHandling" Version="0.1.0" />
-    <PackageReference Include="Kart.Shared.Observability" Version="0.1.0" />
+    <!-- 0.2.0 -> 0.3.0: the vendored 0.2.0 build predates KartFlowContext/FlowEnricher (the
+         business-flow tracing standard's ambient Flow tag), which this checkpoint-logging pass
+         needs; 0.3.0 is additive/non-breaking (see kart-offer-service's identical bump). -->
+    <PackageReference Include="Kart.Shared.Observability" Version="0.3.0" />
     <PackageReference Include="Kart.Shared.Auditing" Version="0.1.0" />
+    <PackageReference Include="Kart.Shared.Configuration" Version="0.2.0" />
   </ItemGroup>
 
   <ItemGroup>

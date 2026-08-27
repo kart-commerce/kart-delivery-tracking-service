@@ -1,5 +1,8 @@
 using System.Text;
 using System.Text.Json;
+using Kart.Shared.Messaging;
+using Kart.Shared.Observability;
+using KartDeliveryTrackingService.Application.Common;
 using KartDeliveryTrackingService.Application.Common.Models;
 using KartDeliveryTrackingService.Application.Features.ApplyCarrierStatusUpdate;
 using KartDeliveryTrackingService.Domain.Tracking;
@@ -88,15 +91,23 @@ public sealed class CarrierStatusIngestedConsumerHostedService : BackgroundServi
             var payload = JsonSerializer.Deserialize<CarrierStatusIngestedEventPayload>(json, SerializerOptions)
                 ?? throw new InvalidOperationException("CarrierStatusIngested payload deserialized to null.");
 
-            var result = await sender.Send(
-                new ApplyCarrierStatusUpdateCommand(
-                    payload.CarrierId,
-                    payload.TrackingId,
-                    payload.CarrierStatusCode,
-                    payload.EventTimestamp,
-                    payload.RawPayload,
-                    IngestionSource.Webhook),
-                stoppingToken);
+            // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - this consumer's entry point.
+            using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
+            _logger.LogInformation(
+                "Stage {Stage}: consumed CarrierStatusIngested from {Queue} for tracking {TrackingId} (carrier {CarrierId})",
+                "CarrierStatusIngestedEventConsumed",
+                QueueName,
+                payload.TrackingId,
+                payload.CarrierId);
+
+            var command = new ApplyCarrierStatusUpdateCommand(
+                payload.CarrierId,
+                payload.TrackingId,
+                payload.CarrierStatusCode,
+                payload.EventTimestamp,
+                payload.RawPayload,
+                IngestionSource.Webhook);
+            var result = await sender.Send(command, stoppingToken);
 
             if (result.IsFailure)
             {
@@ -126,11 +137,11 @@ public sealed class CarrierStatusIngestedConsumerHostedService : BackgroundServi
             channel.BasicPublish(exchange: string.Empty, routingKey: tier.Name, basicProperties: properties, body: deliverEventArgs.Body);
             channel.BasicAck(deliverEventArgs.DeliveryTag, multiple: false);
 
-            _logger.LogWarning(ex, "Handling CarrierStatusIngested failed; routed to retry tier {Tier} (attempt {Attempt}).", tier.Name, retryCount + 1);
+            _logger.LogWarning(ex, "Stage {Stage}: handling CarrierStatusIngested failed; routed to retry tier {Tier} (attempt {Attempt}).", "CarrierStatusIngestedHandlingRetried", tier.Name, retryCount + 1);
         }
         else
         {
-            _logger.LogCritical(ex, "Handling CarrierStatusIngested failed after exhausting all retry tiers; dead-lettering. The polling fallback will re-establish correctness for this tracking id.");
+            _logger.LogCritical(ex, "Stage {Stage}: handling CarrierStatusIngested failed after exhausting all retry tiers; dead-lettering. The polling fallback will re-establish correctness for this tracking id.", "CarrierStatusIngestedHandlingDeadLettered");
             channel.BasicNack(deliverEventArgs.DeliveryTag, multiple: false, requeue: false);
         }
     }

@@ -1,4 +1,7 @@
 using System.Text;
+using Kart.Shared.Messaging;
+using Kart.Shared.Observability;
+using KartDeliveryTrackingService.Application.Common;
 using KartDeliveryTrackingService.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -85,19 +88,35 @@ public sealed class OutboxRelayHostedService : BackgroundService
 
         foreach (var outboxEvent in pending)
         {
+            var exchange = _manifest.ExchangeFor(outboxEvent.EventType);
+            var routingKey = _manifest.RoutingKeyFor(outboxEvent.EventType);
+
             var properties = channel.CreateBasicProperties();
             properties.Persistent = true;
             properties.MessageId = outboxEvent.Id;
             properties.ContentType = "application/json";
 
+            // Every event type this relay ever publishes (CarrierStatusIngested,
+            // UnmappedCarrierStatusFlagged, DeliveryStatusUpdated) belongs to business-flows.md
+            // flow #8, "Shipping, Warehouse & Fulfillment".
+            using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
+
             channel.BasicPublish(
-                exchange: _manifest.ExchangeFor(outboxEvent.EventType),
-                routingKey: _manifest.RoutingKeyFor(outboxEvent.EventType),
+                exchange: exchange,
+                routingKey: routingKey,
                 basicProperties: properties,
                 body: Encoding.UTF8.GetBytes(outboxEvent.Payload));
 
             var update = Builders<Persistence.Documents.TrackingOutboxEventDocument>.Update.Set(d => d.PublishedAt, DateTime.UtcNow);
             await context.OutboxEvents.UpdateOneAsync(d => d.Id == outboxEvent.Id, update, cancellationToken: cancellationToken);
+
+            _logger.LogInformation(
+                "Stage {Stage}: outbox event {EventId} of type {EventType} published to {Exchange}/{RoutingKey}",
+                "OutboxEventPublished",
+                outboxEvent.Id,
+                outboxEvent.EventType,
+                exchange,
+                routingKey);
         }
     }
 }

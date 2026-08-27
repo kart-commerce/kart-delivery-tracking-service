@@ -1,3 +1,5 @@
+using Kart.Shared.Observability;
+using KartDeliveryTrackingService.Application.Common;
 using KartDeliveryTrackingService.Application.Common.Options;
 using KartDeliveryTrackingService.Application.Features.PollStaleShipmentStatus;
 using MediatR;
@@ -30,12 +32,21 @@ public sealed class PollStaleShipmentsHostedService : BackgroundService
         {
             try
             {
+                // business-flows.md flow #8, "Shipping, Warehouse & Fulfillment" - the polling
+                // fallback (TRK-5) that re-establishes correctness independent of the webhook path.
+                using var _ = KartFlowContext.Push(FlowNames.ShippingWarehouseFulfillment);
+                _logger.LogInformation("Stage {Stage}: polling-fallback sweep triggered.", "PollStaleShipmentsSweepTriggered");
+
                 using var scope = _scopeFactory.CreateScope();
                 var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-                var result = await sender.Send(new PollStaleShipmentsCommand(), stoppingToken);
+                var command = new PollStaleShipmentsCommand();
+                var result = await sender.Send(command, stoppingToken);
                 if (result.IsSuccess && result.Value > 0)
                 {
-                    _logger.LogInformation("Polling-fallback sweep processed {Count} stale shipment(s).", result.Value);
+                    _logger.LogInformation(
+                        "Stage {Stage}: polling-fallback sweep processed {Count} stale shipment(s).",
+                        "PollStaleShipmentsSweepCompleted",
+                        result.Value);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
